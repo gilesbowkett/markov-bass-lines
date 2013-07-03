@@ -11,9 +11,10 @@
                 (nth bassline 2))
           (trigrams (rest bassline)))))
 
+(defn get-trigram [bass-line]
+  (println bass-line)
+  (println (trigrams bass-line)))
+
 (defn -main []
-  (println (first transcribed-bass-lines))
-  (println (trigrams (first transcribed-bass-lines)))
-  (println (second transcribed-bass-lines))
-  (println (trigrams (second transcribed-bass-lines))))
+  (map get-trigram transcribed-bass-lines))
 
