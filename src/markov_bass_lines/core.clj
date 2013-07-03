@@ -3,21 +3,9 @@
 (def transcribed-bass-lines (list '(on off on tie on off on tie)
                                   '(on tie off on tie off on on)))
 
-(defn trigrams [bassline]
-  (if (> 3 (count bassline))
-    ()
-    (cons (hash-map (vec (list (first bassline)
-                               (second bassline)))
-                (nth bassline 2))
-          (trigrams (rest bassline)))))
-
-(defn sum-merge [a b]
-  (+ a b))
-
+; much shorter version from https://gist.github.com/gilesbowkett/5915632
 (defn freqs []
-  (let [first-freq (frequencies (trigrams (first transcribed-bass-lines)))
-        second-freq (frequencies (trigrams (second transcribed-bass-lines)))]
-    (merge-with sum-merge first-freq second-freq)))
+  (apply merge-with + (map (comp frequencies (partial partition 3 1)) transcribed-bass-lines)))
 
 ; ???
 
