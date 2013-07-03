@@ -6,13 +6,21 @@
 (defn trigrams [bassline]
   (if (> 3 (count bassline))
     ()
-    (cons {(list (first bassline)
-                     (second bassline))
-                (nth bassline 2)}
+    (cons (hash-map (str (first bassline) " "
+                         (second bassline))
+                (nth bassline 2))
           (trigrams (rest bassline)))))
 
+(defn sum-merge [a b]
+  (+ a b))
+
 (defn -main []
-  (map trigrams transcribed-bass-lines))
+  (let [first-freq (frequencies (trigrams (first transcribed-bass-lines)))
+        second-freq (frequencies (trigrams (second transcribed-bass-lines)))]
+    (merge-with sum-merge first-freq second-freq)))
+
+
+; (all-trigrams transcribed-bass-lines)
 
 ; epic win
 ; markov-bass-lines.core=> (frequencies '(("on off" "on") ("on tie" "off") ("on off" "on")))
