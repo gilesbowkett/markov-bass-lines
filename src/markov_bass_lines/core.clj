@@ -6,15 +6,15 @@
 (defn trigrams [bassline]
   (if (> 3 (count bassline))
     ()
-    (cons (list (list (first bassline)
-                      (second bassline))
-                (nth bassline 2))
+    (cons {(list (first bassline)
+                     (second bassline))
+                (nth bassline 2)}
           (trigrams (rest bassline)))))
 
-(defn get-trigram [bass-line]
-  (println bass-line)
-  (println (trigrams bass-line)))
-
 (defn -main []
-  (map get-trigram transcribed-bass-lines))
+  (map trigrams transcribed-bass-lines))
+
+; epic win
+; markov-bass-lines.core=> (frequencies '(("on off" "on") ("on tie" "off") ("on off" "on")))
+; {("on off" "on") 2, ("on tie" "off") 1}
 
