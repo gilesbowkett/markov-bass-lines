@@ -16,7 +16,7 @@
      (on tie on tie on tie on tie on tie on on tie off on off on tie on tie on tie on tie on tie on on tie off on off))
 
     (NTH_120_G_SpaceDiscoBass
-     (on tie off off off off off on on tie off off off off off on on on on tie off on tie off on tie off on on tie on tie ))
+     (on tie off off off off off on on tie off off off off off on on on on tie off on tie off on tie off on on tie on tie))
 
     (NTH_125_G_SubFunkBass
      (on tie off off on tie off off on tie off off on on off on tie on on off on tie on tie on tie on on tie on tie off))
@@ -33,7 +33,9 @@
     (NTH_130_G_SawFunkBass
      (on tie off off on tie off off on tie on on off on on on on tie on tie on tie off on tie off off off off off off off))))
 
-(def basslines (map (fn [title-and-notes] (first (rest title-and-notes))) titles-and-basslines))
+(def basslines (map (fn [title-and-notes]
+                        (first (rest title-and-notes)))
+                    titles-and-basslines))
 
 (defn n-gram-freqs "get n-grams of arbitrary size, and their frequencies" [n]
   (apply merge-with
