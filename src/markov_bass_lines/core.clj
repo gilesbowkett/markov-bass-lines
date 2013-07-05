@@ -145,9 +145,9 @@
      (out 0 (* mix env amp))))
 
 ; read token from list to beat of metronome
-(defn token-to-midi-action [metro beat lz-sq]
+(defn token-to-midi-action [metro tick lz-sq]
   (let [current-note (first lz-sq)
-        next-tick (+ 1 beat)]
+        next-tick (+ 0.25 tick)]
     (println current-note)
     (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
 
