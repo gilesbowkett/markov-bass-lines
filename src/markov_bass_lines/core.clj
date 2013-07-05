@@ -149,65 +149,70 @@
   (let [current-note (first lz-sq)
         next-tick (+ 0.25 tick)]
     (case current-note
-      on (hoover)
+      on (hoover) ; FIXME: replace this hoover with a better instrument for bass
+    ; on (better-bass-synth (some-function-generating-note-numbers))
       off (stop) ; this is fine to demo the bass lines, but it sucks because it doesn't just stop
                  ; the hoover. if you have drums playing, it stops them too.
-                 ; so to integrate with drums you'll need to something better. (#FIXME)
+                 ; so to integrate with drums you'll need something better. (#FIXME)
       tie ())
     (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
 
 ; run this to hear a sequence of notes on the hoover
-(defn play-infinite-notes []
-  (let [midi-flags (lz-sq-markov first-note)
+(defn play-infinite-loop []
+  (let [midi-flags (cycle (basic-bass-sequence))
         metro (metronome 110)]
     (token-to-midi-action metro (metro) midi-flags)))
 
+; read token from list to beat of metronome, do some sophisticated shit
+(defn token-to-midi-action-2 [metro tick bass-note-actions]
+  (let [current-action (first bass-note-actions)
+        next-action (second bass-note-actions)
+        next-tick (+ 0.25 tick)]
+    (if (= current-action 'on)
+      () ; replace this empty list with code implementing:
+      ; schedule a new note to play
+      ; extend duration if next-action is a tie
+      ; (to determine how long you extend duration, recursively check
+      ;  upcoming actions until you get to an off or an on)
 
-; ibis and baboon code: http://ibisandbaboon.com/2013/01/13/playing-with-music-and-overtone-i/
+      ; i.e., something like this:
+      ; (schedule-new-note (tick (if (= next-action 'tie)
+      ;                              (determine-note-duration (rest bass-note-actions))
+      ;                              123))) ; some number of milliseconds or something
+    )
+    (apply-at (metro next-tick)
+              token-to-midi-action-2
+              metro next-tick
+              (next bass-note-actions) [])))
 
-; I can use that code almost verbatim to play a bassline, except I need to
-; modify it to handle rests, and I could also modify it only slightly to get
-; both bass and drums, if I first get the bassline into a format like this:
-;
-;   (def subject [[:d4 2] [:a4 2] [:f4 2] [:d4 2] [:c#4 2] [:d4 1] [:e4 1]
-;                 [:f4 2.5] [:g4 0.5] [:f4 0.5] [:e4 0.5] [:d4 1]])
-;
-; I think what I'll do is just use the same note every time, to start with. I'd also very
-; much prefer to get some 2-grams and 4-grams in place, to create a more musical sequence.
+; major flaw here; the above is written for the '(on tie off on on etc) format,
+; but the below is written for the '([:c3 on] [:c3 tie] [etc]) format. I think
+; I'll rewrite the above and keep the below, because that makes it easy for me
+; to keep the bassline on the same notes as it loops. so I'll merge in the notes
+; beforehand using a seq comprehension and some kind of note-assigning function.
+(defn determine-note-duration
+  ([subsequent-actions]
+    determine-note-duration subsequent-actions 0)
+  ([subsequent-actions duration]
+    (if (= (second (first subsequent-actions)) 'tie)
+      (determine-note-duration (rest subsequent-actions) (+ duration 0.25))
+      (+ duration 0.19))))
 
-; this gets me about halfway:
-;
-;   (def primitive-bass-line (flatten (list first-note (take 31 (lz-sq-markov first-note)))))
-;   (for [action primitive-bass-line] [:c3 action])
-;
-; the result:
-;
-;   ([:c3 on] [:c3 off] [:c3 on] [:c3 on] [:c3 tie] [:c3 off] [:c3 on] [:c3 on]
-;    [:c3 on] [:c3 off] [:c3 on] [:c3 off] [:c3 off] [:c3 on] [:c3 tie] [:c3 on] [:c3
-;    on] [:c3 tie] [:c3 off] [:c3 on] [:c3 tie] [:c3 on] [:c3 tie] [:c3 tie] [:c3
-;    off] [:c3 on] [:c3 tie] [:c3 on] [:c3 on] [:c3 on] [:c3 tie] [:c3 off])
-;
-; so to get all the way, I need something which collapses ([:c3 on] [:c3 tie]) into a
-; note and a length, and because this is all based on sixteenth notes, that length
-; would be 0.5, i.e., ([:c3 on] [:c3 tie]) => ([:c3 0.5])
-
+; argh
 ; this works:
 (defn sum-ties
   ([note-action-pairs] (sum-ties note-action-pairs 0))
   ([note-action-pairs number]
     (apply + (map (fn [note-action-pair]
-                      0.25)
+                      (if (= (second note-action-pair) 'tie)
+                          0.25
+                          0)) ; this needs to *terminate* its search at this point,
+                              ; i.e., if you hit a non-tie, you're done recursing
+                              ; or otherwise going through the list. this should
+                              ; probably use lazy-seq and recursion.
                   note-action-pairs))))
 
-; (sum-ties '([:c3 on] [:c3 tie])) => ([:c3 0.5])
-
-; however, that only spits back the total as a number, so I need to join it up
-; with the relevant note. and I now need a function to go through that list, and
-; hand *only* the right notes to sum-ties. that might just be a seq comprehension,
-; though.
-
-; ??? (def wtf '([:c3 on] [:c3 tie] [:c3 off] [:c3 on]))
-
+; (sum-ties '([:c3 on] [:c3 tie])) => 0.5
 
 ; gotta get my dev on
 
