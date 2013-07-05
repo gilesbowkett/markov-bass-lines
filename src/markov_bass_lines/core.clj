@@ -144,51 +144,17 @@
          env (env-gen (asr) gate)]
      (out 0 (* mix env amp))))
 
-; http://ibisandbaboon.com/2013/01/13/playing-with-music-and-overtone-i/
-
-(def subject [[:d4 2] [:a4 2] [:f4 2] [:d4 2] [:c#4 2] [:d4 1] [:e4 1]
-              [:f4 2.5] [:g4 0.5] [:f4 0.5] [:e4 0.5] [:d4 1]])
-
-(defn play-one
-  [metronome beat instrument [pitch dur]]
-  (let [end (+ beat dur)]
-    (if pitch
-      (let [id (at (metronome beat) (instrument (note pitch)))]
-        (at (metronome end) (ctl id :gate 0))))
-    end))
-
-(defn play
-  ([metronome inst score]
-     (play metronome (metronome) inst score))
-  ([metronome beat instrument score]
-     (let [cur-note (first score)]
-       (when cur-note
-         (let [next-beat (play-one metronome beat instrument cur-note)]
-           (apply-at (metronome next-beat) play metronome next-beat instrument
-             (next score) []))))))
-
-; to use it:
-(defn ibis-baboon []
-  (play (metronome 120) hoover subject))
-
-
-
-
-
-
-
-
-
 ; read token from list to beat of metronome
-(def foo (lz-sq-markov first-note))
-(def metro (metronome 110))
-
-(defn wtf [metro beat lz-sq]
-  (let [current-note (first lz-sq)]
+(defn token-to-midi-action [metro beat lz-sq]
+  (let [current-note (first lz-sq)
+        next-tick (+ 1 beat)]
     (println current-note)
-    (apply-at (metro (+ 1 beat)) wtf metro (+ 1 beat) (next lz-sq) [])))
+    (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
 
-; (wtf metro (metro) foo)
+(defn timed-token-println []
+  (let [midi-flags (lz-sq-markov first-note)
+        metro (metronome 110)]
+    (token-to-midi-action metro (metro) midi-flags)))
 
 
 ; add drums
