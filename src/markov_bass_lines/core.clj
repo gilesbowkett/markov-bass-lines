@@ -1,5 +1,6 @@
 (ns markov-bass-lines.core
-  (:require [clojure.math.numeric-tower :as math]))
+  (:require [clojure.math.numeric-tower :as math])
+  (:use overtone.live))
 
 (def titles-and-basslines
   '((NTH_110_A_FunkBass
@@ -49,19 +50,10 @@
 ; probably every funk bassline since the dawn of time.
 (def first-note 'on)
 
-(defn translate-frequencies-into-probabilities []
-  ; the problem: get from here --> {(tie tie) 1, (tie on) 3}
-  ;                    to here --> {tie {tie 0.25, on 0.75}}
-
-  ;              and from here --> {(off on off) 22, (off on on) 16, (off on tie) 19}
-  ;                    to here --> {"off on" [{off 0.39, on 0.28, tie 0.33}
-
-  "oops")
-
 (defn determine-probabilities [tokens-and-frequencies]
   (map (fn [t-and-f]
            (let [freq (last t-and-f)
-                       tokens (first t-and-f)]
+                 tokens (first t-and-f)]
              {tokens (/ freq
                         (apply +
                                (vals tokens-and-frequencies)))}))
@@ -69,19 +61,17 @@
 
 (defn relevant-n-grams-only [tokens-and-frequencies target-token]
   (filter (fn [t-and-f]
-            (= target-token
-               (first (first t-and-f))))
+              (= target-token
+                 (first (first t-and-f))))
           tokens-and-frequencies))
 
 ; markov-bass-lines.core=> (determine-probabilities (relevant-n-grams-only '{(tie tie) 1, (tie on) 3, (foo bar) 1} 'tie))
 ; ({(tie tie) 1/4} {(tie on) 3/4})
 
-; the next thing is find the lowest common denominator of this map, multiply each of the tokens by that number, and
-; put them all in a big list. then just pull a random element from that list; voila, Markov. then you add more
-; sophistication later, maybe.
-
 (defn denominators [probability-map]
-  (distinct (map (fn [fraction] (denominator (first (vals fraction)))) probability-map)))
+  (distinct (map (fn [fraction]
+                     (denominator (first (vals fraction))))
+                 probability-map)))
 
 (defn denominator-for-markov-list [probability-map]
   (let [denoms (denominators probability-map)]
@@ -101,25 +91,111 @@
                 probability-map)))
 
 ; now randomly select an element from the above list
-(defn second-note []
+(defn choose-markov-element [prev-element]
+  ; probably for efficiency I should move some of this up a bit, later. the only
+  ; part that actually needs to run every time is rand-nth. and of course it has
+  ; to scoop up the prev elements and collect/recycle them. I guess the argument
+  ; to n-gram-freqs will change too. hmm
   (rand-nth
     (make-markov-list
       (determine-probabilities
         (relevant-n-grams-only (n-gram-freqs 2)
-                               first-note)))))
+                               prev-element)))))
 
-; this does not work for shit
-  (let [freqs (n-gram-freqs 2)
-        choices '((on off) ; this list should be dynamically generated
-                  (on on)  ; e.g., (choices (freqs first-note))
-                  (on tie))]
-    (freqs (first choices))))
+(defn lz-sq-markov [prev-element]
+    (lazy-seq
+      (let [new-element (choose-markov-element prev-element)]
+        (cons new-element
+              (lz-sq-markov new-element)))))
+
+(defn basic-bass-sequence []
+  ; probably for elegance some of this logic should roll up into lz-sq-markov
+  (concat [first-note]
+          (take 32 (lz-sq-markov first-note))))
+
+; scavenged hoover
+
+(defsynth hoover [freq 220 amp 10 lgu 0.1 lgd 1 gate 1]
+   (let [pwm (lin-lin (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
+         freq (lag-ud freq lgu lgd)
+         freq (*
+                freq
+                (lin-exp (sin-osc:kr
+                               (vec (repeatedly 3 #(ranged-rand 2.9 3.1)))
+                               (vec (repeatedly 3 #(ranged-rand 0 (* 2 Math/PI))))
+                               ) -1 1 0.995 1.005))
+         mix (*
+               0.1
+               (apply +
+                      (*
+                        (lin-lin (lf-saw (* [0.25 0.5 1] freq) 1) -1 1 0 1)
+                        (- 1 (lf-pulse:ar (* freq [0.5 1 2]) 0 pwm)))))
+         ;bass
+         mix (+ mix (lf-par (* 0.25 freq) 0))
+         mix (mul-add mix 0.1 0)
+         ;eq
+         mix (b-peak-eq mix 6000 1 3)
+         mix (b-peak-eq mix 3500 1 6)
+         ;chorus
+         mix (+ mix
+               (* 0.5 (comb-c mix 1/200
+                           (lin-lin (sin-osc:kr 3 [(* 0.5 Math/PI) (* 1.5 Math/PI)]) -1 1 1/300 1/200)
+                           0)))
+         env (env-gen (asr) gate)]
+     (out 0 (* mix env amp))))
+
+; http://ibisandbaboon.com/2013/01/13/playing-with-music-and-overtone-i/
+
+(def subject [[:d4 2] [:a4 2] [:f4 2] [:d4 2] [:c#4 2] [:d4 1] [:e4 1]
+              [:f4 2.5] [:g4 0.5] [:f4 0.5] [:e4 0.5] [:d4 1]])
+
+(defn play-one
+  [metronome beat instrument [pitch dur]]
+  (let [end (+ beat dur)]
+    (if pitch
+      (let [id (at (metronome beat) (instrument (note pitch)))]
+        (at (metronome end) (ctl id :gate 0))))
+    end))
+
+(defn play
+  ([metronome inst score]
+     (play metronome (metronome) inst score))
+  ([metronome beat instrument score]
+     (let [cur-note (first score)]
+       (when cur-note
+         (let [next-beat (play-one metronome beat instrument cur-note)]
+           (apply-at (metronome next-beat) play metronome next-beat instrument
+             (next score) []))))))
+
+; to use it:
+(defn ibis-baboon []
+  (play (metronome 120) hoover subject))
+
+
+
+
+
+
+
+
+
+; read token from list to beat of metronome
+(def foo (lz-sq-markov first-note))
+(def metro (metronome 110))
+
+(defn wtf [metro beat lz-sq]
+  (let [current-note (first lz-sq)]
+    (println current-note)
+    (apply-at (metro (+ 1 beat)) wtf metro (+ 1 beat) (next lz-sq) [])))
+
+; (wtf metro (metro) foo)
+
+
+; add drums
 
 ; gotta get my dev on
 
 (def fg "you have to quit the repl with control-D first")
-
-(def example (determine-probabilities (relevant-n-grams-only (n-gram-freqs 2) 'on)))
 
 ; lein bs
 
