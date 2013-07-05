@@ -148,14 +148,18 @@
 (defn token-to-midi-action [metro tick lz-sq]
   (let [current-note (first lz-sq)
         next-tick (+ 0.25 tick)]
-    (println current-note)
+    (case current-note
+      on (hoover)
+      off (stop) ; this is fine to demo the bass lines, but it sucks because it doesn't just stop
+                 ; the hoover. it stops *everything*. so to integrate with drums you'll need to
+                 ; something better. (#FIXME)
+      tie ())
     (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
 
-(defn timed-token-println []
+(defn play-infinite-notes []
   (let [midi-flags (lz-sq-markov first-note)
         metro (metronome 110)]
     (token-to-midi-action metro (metro) midi-flags)))
-
 
 ; add drums
 
