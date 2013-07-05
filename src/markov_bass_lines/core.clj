@@ -115,7 +115,7 @@
 
 ; scavenged hoover
 
-(defsynth hoover [freq 220 amp 10 lgu 0.1 lgd 1 gate 1]
+(defsynth hoover [freq 440 amp 10 lgu 0.1 lgd 1 gate 1]
    (let [pwm (lin-lin (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
          freq (lag-ud freq lgu lgd)
          freq (*
@@ -144,24 +144,70 @@
          env (env-gen (asr) gate)]
      (out 0 (* mix env amp))))
 
-; read token from list to beat of metronome
+; read token from list to beat of metronome, play or don't accordingly
 (defn token-to-midi-action [metro tick lz-sq]
   (let [current-note (first lz-sq)
         next-tick (+ 0.25 tick)]
     (case current-note
       on (hoover)
       off (stop) ; this is fine to demo the bass lines, but it sucks because it doesn't just stop
-                 ; the hoover. it stops *everything*. so to integrate with drums you'll need to
-                 ; something better. (#FIXME)
+                 ; the hoover. if you have drums playing, it stops them too.
+                 ; so to integrate with drums you'll need to something better. (#FIXME)
       tie ())
     (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
 
+; run this to hear a sequence of notes on the hoover
 (defn play-infinite-notes []
   (let [midi-flags (lz-sq-markov first-note)
         metro (metronome 110)]
     (token-to-midi-action metro (metro) midi-flags)))
 
-; add drums
+
+; ibis and baboon code: http://ibisandbaboon.com/2013/01/13/playing-with-music-and-overtone-i/
+
+; I can use that code almost verbatim to play a bassline, except I need to
+; modify it to handle rests, and I could also modify it only slightly to get
+; both bass and drums, if I first get the bassline into a format like this:
+;
+;   (def subject [[:d4 2] [:a4 2] [:f4 2] [:d4 2] [:c#4 2] [:d4 1] [:e4 1]
+;                 [:f4 2.5] [:g4 0.5] [:f4 0.5] [:e4 0.5] [:d4 1]])
+;
+; I think what I'll do is just use the same note every time, to start with. I'd also very
+; much prefer to get some 2-grams and 4-grams in place, to create a more musical sequence.
+
+; this gets me about halfway:
+;
+;   (def primitive-bass-line (flatten (list first-note (take 31 (lz-sq-markov first-note)))))
+;   (for [action primitive-bass-line] [:c3 action])
+;
+; the result:
+;
+;   ([:c3 on] [:c3 off] [:c3 on] [:c3 on] [:c3 tie] [:c3 off] [:c3 on] [:c3 on]
+;    [:c3 on] [:c3 off] [:c3 on] [:c3 off] [:c3 off] [:c3 on] [:c3 tie] [:c3 on] [:c3
+;    on] [:c3 tie] [:c3 off] [:c3 on] [:c3 tie] [:c3 on] [:c3 tie] [:c3 tie] [:c3
+;    off] [:c3 on] [:c3 tie] [:c3 on] [:c3 on] [:c3 on] [:c3 tie] [:c3 off])
+;
+; so to get all the way, I need something which collapses ([:c3 on] [:c3 tie]) into a
+; note and a length, and because this is all based on sixteenth notes, that length
+; would be 0.5, i.e., ([:c3 on] [:c3 tie]) => ([:c3 0.5])
+
+; this works:
+(defn sum-ties
+  ([note-action-pairs] (sum-ties note-action-pairs 0))
+  ([note-action-pairs number]
+    (apply + (map (fn [note-action-pair]
+                      0.25)
+                  note-action-pairs))))
+
+; (sum-ties '([:c3 on] [:c3 tie])) => ([:c3 0.5])
+
+; however, that only spits back the total as a number, so I need to join it up
+; with the relevant note. and I now need a function to go through that list, and
+; hand *only* the right notes to sum-ties. that might just be a seq comprehension,
+; though.
+
+; ??? (def wtf '([:c3 on] [:c3 tie] [:c3 off] [:c3 on]))
+
 
 ; gotta get my dev on
 
