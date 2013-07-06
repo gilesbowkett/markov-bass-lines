@@ -164,10 +164,14 @@
     (token-to-midi-action metro (metro) midi-flags)))
 
 ; read token from list to beat of metronome, do some sophisticated shit
-(defn token-to-midi-action-2 [metro tick bass-note-actions]
-  (let [current-action (first bass-note-actions)
-        next-action (second bass-note-actions)
+(defn token-to-midi-action-2 [metro tick note-action-pairs]
+  (let [current-note (first (first note-action-pairs))
+        current-action (second (first note-action-pairs))
+        next-action (second (second note-action-pairs))
         next-tick (+ 0.25 tick)]
+    (println current-note)
+    (println current-action)
+    (println next-action)
     (if (= current-action 'on)
       () ; replace this empty list with code implementing:
       ; schedule a new note to play
@@ -177,13 +181,13 @@
 
       ; i.e., something like this:
       ; (schedule-new-note (tick (if (= next-action 'tie)
-      ;                              (determine-note-duration (rest bass-note-actions))
+      ;                              (determine-note-duration (rest note-action-pairs))
       ;                              123))) ; some number of milliseconds or something
     )
     (apply-at (metro next-tick)
               token-to-midi-action-2
               metro next-tick
-              (next bass-note-actions) [])))
+              (next note-action-pairs) [])))
 
 ; major flaw here; the above is written for the '(on tie off on on etc) format,
 ; but the below is written for the '([:c3 on] [:c3 tie] [etc]) format. I think
