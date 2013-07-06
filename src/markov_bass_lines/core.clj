@@ -163,11 +163,15 @@
         metro (metronome 110)]
     (token-to-midi-action metro (metro) midi-flags)))
 
-; (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+; infinite:
+;   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+; finite:
+;   (token-to-midi-action-2 metro (metro) primitive-bass-line)
 
 ; read token from list to beat of metronome, do some sophisticated shit
+(def metro (metronome 110))
 (def action-list (basic-bass-sequence))
-(def primitive-bass-line (for [action action-list] [:c3 action]))
+(def primitive-bass-line (for [action action-list] [:c4 action]))
 ; primitive-bass-line is a straight list, not a loop; use the code which uses "cycle" for an infinite loop
 ; however that line of code is legit; just create something dynamic to replace the hard-coded :c3 note
 
@@ -175,7 +179,7 @@
 ; note-assigning function.
 (defn determine-note-duration
   ([subsequent-actions]
-    determine-note-duration subsequent-actions 0)
+    (determine-note-duration subsequent-actions 0))
   ([subsequent-actions duration]
     (if (= (second (first subsequent-actions)) 'tie)
       (determine-note-duration (rest subsequent-actions) (+ duration 0.25))
@@ -188,15 +192,14 @@
         next-action (second (second note-action-pairs))
         next-tick (+ 0.25 tick)]
     (if (= current-action 'on)
-      (let [duration (determine-note-duration (rest note-action-pairs))]
-        (at (metro tick) (println current-action)) ; this is a stub
-      ; (let [hoover-id (at (metro tick) (hoover (note current-note)))]
-        (at (metro (+ tick duration)) (println "off")))) ; also a stub
-      ;   (at (metro (+ tick duration)) (ctl hoover-id :gate 0)))))
-    (apply-at (metro next-tick)
-              token-to-midi-action-2
-              metro next-tick
-              (next note-action-pairs) [])))
+      (let [duration (determine-note-duration (rest note-action-pairs))
+            hoover-id (at (metro tick) (hoover (note current-note)))]
+        (at (metro (+ tick duration)) (ctl hoover-id :gate 0))))
+    (if (not (empty? note-action-pairs))
+      (apply-at (metro next-tick)
+                token-to-midi-action-2
+                metro next-tick
+                (next note-action-pairs) []))))
 
 ; argh
 ; this works:
