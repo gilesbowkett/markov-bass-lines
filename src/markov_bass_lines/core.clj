@@ -111,7 +111,7 @@
 (defn basic-bass-sequence []
   ; probably for elegance some of this logic should roll up into lz-sq-markov
   (concat [first-note]
-          (take 32 (lz-sq-markov first-note))))
+          (take 31 (lz-sq-markov first-note))))
 
 ; scavenged hoover
 
@@ -163,37 +163,16 @@
         metro (metronome 110)]
     (token-to-midi-action metro (metro) midi-flags)))
 
+; (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+
 ; read token from list to beat of metronome, do some sophisticated shit
-(defn token-to-midi-action-2 [metro tick note-action-pairs]
-  (let [current-note (first (first note-action-pairs))
-        current-action (second (first note-action-pairs))
-        next-action (second (second note-action-pairs))
-        next-tick (+ 0.25 tick)]
-    (println current-note)
-    (println current-action)
-    (println next-action)
-    (if (= current-action 'on)
-      () ; replace this empty list with code implementing:
-      ; schedule a new note to play
-      ; extend duration if next-action is a tie
-      ; (to determine how long you extend duration, recursively check
-      ;  upcoming actions until you get to an off or an on)
+(def action-list (basic-bass-sequence))
+(def primitive-bass-line (for [action action-list] [:c3 action]))
+; primitive-bass-line is a straight list, not a loop; use the code which uses "cycle" for an infinite loop
+; however that line of code is legit; just create something dynamic to replace the hard-coded :c3 note
 
-      ; i.e., something like this:
-      ; (schedule-new-note (tick (if (= next-action 'tie)
-      ;                              (determine-note-duration (rest note-action-pairs))
-      ;                              123))) ; some number of milliseconds or something
-    )
-    (apply-at (metro next-tick)
-              token-to-midi-action-2
-              metro next-tick
-              (next note-action-pairs) [])))
-
-; major flaw here; the above is written for the '(on tie off on on etc) format,
-; but the below is written for the '([:c3 on] [:c3 tie] [etc]) format. I think
-; I'll rewrite the above and keep the below, because that makes it easy for me
-; to keep the bassline on the same notes as it loops. so I'll merge in the notes
-; beforehand using a seq comprehension and some kind of note-assigning function.
+; merge in the notes beforehand using a seq comprehension and some kind of
+; note-assigning function.
 (defn determine-note-duration
   ([subsequent-actions]
     determine-note-duration subsequent-actions 0)
@@ -201,6 +180,23 @@
     (if (= (second (first subsequent-actions)) 'tie)
       (determine-note-duration (rest subsequent-actions) (+ duration 0.25))
       (+ duration 0.19))))
+
+
+(defn token-to-midi-action-2 [metro tick note-action-pairs]
+  (let [current-note (first (first note-action-pairs))
+        current-action (second (first note-action-pairs))
+        next-action (second (second note-action-pairs))
+        next-tick (+ 0.25 tick)]
+    (if (= current-action 'on)
+      (let [duration (determine-note-duration (rest note-action-pairs))]
+        (at (metro tick) (println current-action)) ; this is a stub
+      ; (let [hoover-id (at (metro tick) (hoover (note current-note)))]
+        (at (metro (+ tick duration)) (println "off")))) ; also a stub
+      ;   (at (metro (+ tick duration)) (ctl hoover-id :gate 0)))))
+    (apply-at (metro next-tick)
+              token-to-midi-action-2
+              metro next-tick
+              (next note-action-pairs) [])))
 
 ; argh
 ; this works:
