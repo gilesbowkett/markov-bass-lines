@@ -114,12 +114,28 @@
           (take 31 (lz-sq-markov first-note))))
 
 ; scavenged bass synth
+; https://github.com/overtone/overtone/blob/master/src/overtone/inst/synth.clj
 
-; saw wave from the-composing-schemer
-(definst bass-synth [freq 440 attack 0.01 sustain 0.09 release 0.09 vol 0.9]
-  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
-     (saw freq)
-     vol))
+(definst bass
+  [freq 120 t 0.6 amp 0.5]
+  (let [env  (env-gen (perc 0.08 t) :action FREE)
+        src  (saw [freq (* 0.98 freq) (* 2.015 freq)])
+        src  (clip2 (* 1.3 src) 0.8)
+        sub  (sin-osc (/ freq 2))
+        filt (resonz (rlpf src (* 4.4 freq) 0.09) (* 2.0 freq) 2.9)]
+    (* env amp (fold:ar (distort (* 1.3 (+ filt sub))) 0.08))))
+
+(def bass-synth bass)
+
+; foolishness
+(definst bubbles
+  [bass-freq 80]
+  (let [bub (+ bass-freq (* 3 (lf-saw:kr [8 7.23])))
+        glis (+ bub (* 24 (lf-saw:kr 0.4 0)))
+        freq (midicps glis)
+        src (* 0.04 (sin-osc freq))
+        zout (comb-n src :decay-time 4)]
+    zout))
 
 ; infinite:
 ;   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
@@ -129,11 +145,13 @@
 ; moom:
 ;   (simple-moom metro (metro))
 
+(defn random-minor-pentatonic []
+  (rand-nth [:eb3 :gb3 :ab3 :bb3 :db3 :eb3]))
+
 ; read token from list to beat of metronome, do some sophisticated shit
 (def metro (metronome 110))
 (def action-list (basic-bass-sequence))
-; (def primitive-bass-line (for [action action-list] [:c4 action]))
-(def primitive-bass-line (for [action action-list] [:c3 action]))
+(def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
 ; primitive-bass-line is a straight list, not a loop; use the code which uses "cycle" for an infinite loop
 ; however that line of code is legit; just create something dynamic to replace the hard-coded :c3 note
 
@@ -197,7 +215,17 @@
   (apply-at (metro (+ 4 beat-number)) simple-moom metro (+ 4 beat-number) []))
 
 (defn go []
+  ; FIXME: these should be in a let, not global like this
+  (def action-list (basic-bass-sequence))
+  (def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
   (simple-moom metro (metro))
+  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
+
+(defn bass-only []
+  ; FIXME: these should be in a let, not global like this
+  ; FIXME: DRY
+  (def action-list (basic-bass-sequence))
+  (def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
 
 ; gotta get my dev on
