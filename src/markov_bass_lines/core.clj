@@ -144,25 +144,6 @@
          env (env-gen (asr) gate)]
      (out 0 (* mix env amp))))
 
-; read token from list to beat of metronome, play or don't accordingly
-(defn token-to-midi-action [metro tick lz-sq]
-  (let [current-note (first lz-sq)
-        next-tick (+ 0.25 tick)]
-    (case current-note
-      on (hoover) ; FIXME: replace this hoover with a better instrument for bass
-    ; on (better-bass-synth (some-function-generating-note-numbers))
-      off (stop) ; this is fine to demo the bass lines, but it sucks because it doesn't just stop
-                 ; the hoover. if you have drums playing, it stops them too.
-                 ; so to integrate with drums you'll need something better. (#FIXME)
-      tie ())
-    (apply-at (metro next-tick) token-to-midi-action metro next-tick (next lz-sq) [])))
-
-; run this to hear a sequence of notes on the hoover
-(defn play-infinite-loop []
-  (let [midi-flags (cycle (basic-bass-sequence))
-        metro (metronome 110)]
-    (token-to-midi-action metro (metro) midi-flags)))
-
 ; infinite:
 ;   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
 ; finite:
@@ -200,22 +181,6 @@
                 token-to-midi-action-2
                 metro next-tick
                 (next note-action-pairs) []))))
-
-; argh
-; this works:
-(defn sum-ties
-  ([note-action-pairs] (sum-ties note-action-pairs 0))
-  ([note-action-pairs number]
-    (apply + (map (fn [note-action-pair]
-                      (if (= (second note-action-pair) 'tie)
-                          0.25
-                          0)) ; this needs to *terminate* its search at this point,
-                              ; i.e., if you hit a non-tie, you're done recursing
-                              ; or otherwise going through the list. this should
-                              ; probably use lazy-seq and recursion.
-                  note-action-pairs))))
-
-; (sum-ties '([:c3 on] [:c3 tie])) => 0.5
 
 ; gotta get my dev on
 
