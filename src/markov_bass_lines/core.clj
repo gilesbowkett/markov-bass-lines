@@ -113,46 +113,27 @@
   (concat [first-note]
           (take 31 (lz-sq-markov first-note))))
 
-; scavenged hoover
+; scavenged bass synth
 
-(defsynth hoover [freq 440 amp 10 lgu 0.1 lgd 1 gate 1]
-   (let [pwm (lin-lin (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
-         freq (lag-ud freq lgu lgd)
-         freq (*
-                freq
-                (lin-exp (sin-osc:kr
-                               (vec (repeatedly 3 #(ranged-rand 2.9 3.1)))
-                               (vec (repeatedly 3 #(ranged-rand 0 (* 2 Math/PI))))
-                               ) -1 1 0.995 1.005))
-         mix (*
-               0.1
-               (apply +
-                      (*
-                        (lin-lin (lf-saw (* [0.25 0.5 1] freq) 1) -1 1 0 1)
-                        (- 1 (lf-pulse:ar (* freq [0.5 1 2]) 0 pwm)))))
-         ;bass
-         mix (+ mix (lf-par (* 0.25 freq) 0))
-         mix (mul-add mix 0.1 0)
-         ;eq
-         mix (b-peak-eq mix 6000 1 3)
-         mix (b-peak-eq mix 3500 1 6)
-         ;chorus
-         mix (+ mix
-               (* 0.5 (comb-c mix 1/200
-                           (lin-lin (sin-osc:kr 3 [(* 0.5 Math/PI) (* 1.5 Math/PI)]) -1 1 1/300 1/200)
-                           0)))
-         env (env-gen (asr) gate)]
-     (out 0 (* mix env amp))))
+; saw wave from the-composing-schemer
+(definst bass-synth [freq 440 attack 0.01 sustain 0.09 release 0.09 vol 0.9]
+  (* (env-gen (lin-env attack sustain release) 1 1 0 1 FREE)
+     (saw freq)
+     vol))
 
 ; infinite:
 ;   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
 ; finite:
 ;   (token-to-midi-action-2 metro (metro) primitive-bass-line)
 
+; moom:
+;   (simple-moom metro (metro))
+
 ; read token from list to beat of metronome, do some sophisticated shit
 (def metro (metronome 110))
 (def action-list (basic-bass-sequence))
-(def primitive-bass-line (for [action action-list] [:c4 action]))
+; (def primitive-bass-line (for [action action-list] [:c4 action]))
+(def primitive-bass-line (for [action action-list] [:c3 action]))
 ; primitive-bass-line is a straight list, not a loop; use the code which uses "cycle" for an infinite loop
 ; however that line of code is legit; just create something dynamic to replace the hard-coded :c3 note
 
@@ -174,13 +155,50 @@
         next-tick (+ 0.25 tick)]
     (if (= current-action 'on)
       (let [duration (determine-note-duration (rest note-action-pairs))
-            hoover-id (at (metro tick) (hoover (note current-note)))]
-        (at (metro (+ tick duration)) (ctl hoover-id :gate 0))))
+            bass-synth-id (at (metro tick) (bass-synth (note current-note)))]
+        (at (metro (+ tick duration)) (ctl bass-synth-id :gate 0))))
     (if (not (empty? note-action-pairs))
       (apply-at (metro next-tick)
                 token-to-midi-action-2
                 metro next-tick
                 (next note-action-pairs) []))))
+
+(def snare (sample (freesound-path 26903)))
+(def kick (sample (freesound-path 2086)))
+
+(definst hat [volume 1.0]
+  (let [src (white-noise)
+        env (env-gen (perc 0.001 0.1) :action FREE)]
+    (* volume 1 src env)))
+
+(defn weak-hat []
+  (hat 0.3))
+
+(defn simple-moom [metro beat-number]
+
+  ; kick
+  (at (metro (+ 0 beat-number)) (kick))
+  (at (metro (+ 1 beat-number)) (kick))
+  (at (metro (+ 2 beat-number)) (kick))
+  (at (metro (+ 3 beat-number)) (kick))
+
+  ; snare
+  (at (metro (+ 0.75 beat-number)) (snare))
+  (at (metro (+ 1.5 beat-number)) (snare))
+  (at (metro (+ 2.75 beat-number)) (snare))
+  (at (metro (+ 3.5 beat-number)) (snare))
+
+  ; hat
+  (at (metro (+ 0.5 beat-number)) (weak-hat))
+  (at (metro (+ 1.5 beat-number)) (weak-hat))
+  (at (metro (+ 2.5 beat-number)) (weak-hat))
+  (at (metro (+ 3.5 beat-number)) (weak-hat))
+
+  (apply-at (metro (+ 4 beat-number)) simple-moom metro (+ 4 beat-number) []))
+
+(defn go []
+  (simple-moom metro (metro))
+  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
 
 ; gotta get my dev on
 
@@ -189,4 +207,9 @@
 ; lein bs
 
 (defn -main [])
+
+; these synths sound great even though the project they're in doesn't even run >.<
+; https://github.com/ctford/whelmed/blob/master/src/whelmed/instrument.clj
+
+; FIXME the harder problem is getting the drums to happen at the same time
 
