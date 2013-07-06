@@ -146,7 +146,7 @@
 ;   (simple-moom metro (metro))
 
 (defn random-minor-pentatonic []
-  (rand-nth [:eb3 :gb3 :ab3 :bb3 :db3 :eb3]))
+  (rand-nth [:eb3 :gb3 :ab3 :bb3 :db3 :eb4]))
 
 ; read token from list to beat of metronome, do some sophisticated shit
 (def metro (metronome 110))
@@ -214,14 +214,15 @@
 
   (apply-at (metro (+ 4 beat-number)) simple-moom metro (+ 4 beat-number) []))
 
-(defn go []
-  ; FIXME: these should be in a let, not global like this
-  (def action-list (basic-bass-sequence))
-  (def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
-  (simple-moom metro (metro))
-  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
+(defn drums []
+  (simple-moom metro (metro)))
 
-(defn bass-only []
+
+(defn go []
+  (drums)
+  (bass))
+
+(defn bass []
   ; FIXME: these should be in a let, not global like this
   ; FIXME: DRY
   (def action-list (basic-bass-sequence))
