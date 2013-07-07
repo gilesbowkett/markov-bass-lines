@@ -1,7 +1,9 @@
+; namespace and library requires (clojure plumbing)
 (ns markov-bass-lines.core
   (:require [clojure.math.numeric-tower :as math])
   (:use overtone.live))
 
+; transcribed by hand, using a Matrix in Reason, from loops by Nick Thayer
 (def titles-and-basslines
   '((NTH_110_A_FunkBass
      (on tie off on on tie off off on tie on on off on off on on tie on on off on off on on on on on tie off on off))
@@ -33,10 +35,12 @@
     (NTH_130_G_SawFunkBass
      (on tie off off on tie off off on tie on on off on on on on tie on tie on tie off on tie off off off off off off off))))
 
+; actually I don't need the titles
 (def basslines (map (fn [title-and-notes]
                         (first (rest title-and-notes)))
                     titles-and-basslines))
 
+; the lone properly-documented function
 (defn n-gram-freqs
       "get n-grams of arbitrary size, and their frequencies"
       [n]
@@ -50,6 +54,11 @@
 ; probably every funk bassline since the dawn of time.
 (def first-note 'on)
 
+; find out how probable any given sequence of tokens is
+; e.g., (determine-probabilities (n-gram-freqs 2))
+; or (determine-probabilities (n-gram-freqs 4))
+; which yields ...{(tie tie tie off) 1/290} {(on on tie off) 1/29}...
+; one combo ten times more likely than the other
 (defn determine-probabilities [tokens-and-frequencies]
   (map (fn [t-and-f]
            (let [freq (last t-and-f)
@@ -59,6 +68,9 @@
                                (vals tokens-and-frequencies)))}))
        tokens-and-frequencies))
 
+; filter out irrelevant n-grams, e.g.:
+; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 2) 'on))
+; --> ({(on tie) 62/131} {(on on) 34/131} {(on off) 35/131})
 (defn relevant-n-grams-only [tokens-and-frequencies target-token]
   (filter (fn [t-and-f]
               (= target-token
@@ -68,22 +80,27 @@
 ; markov-bass-lines.core=> (determine-probabilities (relevant-n-grams-only '{(tie tie) 1, (tie on) 3, (foo bar) 1} 'tie))
 ; ({(tie tie) 1/4} {(tie on) 3/4})
 
+; find the denominators in a list like that
 (defn denominators [probability-map]
   (distinct (map (fn [fraction]
                      (denominator (first (vals fraction))))
                  probability-map)))
 
+; figure out the lowest common denominator
 (defn denominator-for-markov-list [probability-map]
   (let [denoms (denominators probability-map)]
     (if (= 1 (count denoms))
       (first denoms)
       (reduce math/lcm denoms))))
 
+; multiply all fractions by a common denominator
 (defn normalize-markov-elements [token-fraction-pair list-denom]
   (let [possible-choice (second (first (first token-fraction-pair)))
         num (last (last token-fraction-pair))]
     (repeat (* list-denom num) possible-choice)))
 
+; create a big list to grab random elements from, like the markov
+; implementation we did in class
 (defn make-markov-list [probability-map]
   (flatten (map (fn [t-f-pair]
                     (normalize-markov-elements t-f-pair
@@ -95,37 +112,61 @@
   ; probably for efficiency I should move some of this up a bit, later. the only
   ; part that actually needs to run every time is rand-nth. and of course it has
   ; to scoop up the prev elements and collect/recycle them. I guess the argument
-  ; to n-gram-freqs will change too. hmm
+  ; to n-gram-freqs will change too, when I make the markov process more layered.
   (rand-nth
     (make-markov-list
       (determine-probabilities
         (relevant-n-grams-only (n-gram-freqs 2)
                                prev-element)))))
 
+; create a clojure "lazy sequence" (infinite quasi-list)
+; tldr this is how you recurse
 (defn lz-sq-markov [prev-element]
     (lazy-seq
       (let [new-element (choose-markov-element prev-element)]
         (cons new-element
               (lz-sq-markov new-element)))))
 
+; grab 32 16th notes, i.e., a two-bar bassline loop
 (defn basic-bass-sequence []
   ; probably for elegance some of this logic should roll up into lz-sq-markov
   (concat [first-note]
           (take 31 (lz-sq-markov first-note))))
 
-; scavenged bass synth
-; https://github.com/overtone/overtone/blob/master/src/overtone/inst/synth.clj
+; scavenged synth (modified)
+; http://jvmsoup.com/2012/11/28/hoover-sound-in-overtone/
+(defsynth hoover [freq 220 amp 5 lgu 0.1 lgd 1 gate 1]
+   (let [pwm (lin-lin (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
+         freq (lag-ud freq lgu lgd)
+         freq (*
+                freq
+                (lin-exp (sin-osc:kr
+                               (vec (repeatedly 3 #(ranged-rand 2.9 3.1)))
+                               (vec (repeatedly 3 #(ranged-rand 0 (* 2 Math/PI))))
+                               ) -1 1 0.995 1.005))
+         mix (*
+               0.1
+               (apply +
+                      (*
+                        (lin-lin (lf-saw (* [0.25 0.5 1] freq) 1) -1 1 0 1)
+                        (- 1 (lf-pulse:ar (* freq [0.5 1 2]) 0 pwm)))))
+         ;bass
+         mix (+ mix (lf-par (* 0.25 freq) 0))
+         mix (mul-add mix 0.1 0)
+         ;eq
+         mix (b-peak-eq mix 6000 1 3)
+         mix (b-peak-eq mix 3500 1 6)
+         ;chorus
+         mix (+ mix
+               (* 0.5 (comb-c mix 1/200
+                           (lin-lin (sin-osc:kr 3 [(* 0.5 Math/PI) (* 1.5 Math/PI)]) -1 1 1/300 1/200)
+                           0)))
+         env (env-gen (asr) gate)]
+     (out 0 (* mix env amp))))
 
-(definst bass
-  [freq 120 t 0.6 amp 0.5]
-  (let [env  (env-gen (perc 0.08 t) :action FREE)
-        src  (saw [freq (* 0.98 freq) (* 2.015 freq)])
-        src  (clip2 (* 1.3 src) 0.8)
-        sub  (sin-osc (/ freq 2))
-        filt (resonz (rlpf src (* 4.4 freq) 0.09) (* 2.0 freq) 2.9)]
-    (* env amp (fold:ar (distort (* 1.3 (+ filt sub))) 0.08))))
+(def bass-synth hoover)
 
-(def bass-synth bass)
+
 
 ; foolishness
 (definst bubbles
@@ -142,21 +183,22 @@
 ; finite:
 ;   (token-to-midi-action-2 metro (metro) primitive-bass-line)
 
-; moom:
-;   (simple-moom metro (metro))
-
+; get a random note from the minor pentatonic Eb scale (all black keys)
 (defn random-minor-pentatonic []
-  (rand-nth [:eb3 :gb3 :ab3 :bb3 :db3 :eb4]))
+  (rand-nth [:eb15 :gb15 :ab15 :bb15 :db15 :eb16]))
 
-; read token from list to beat of metronome, do some sophisticated shit
+; now we get serious
+
+; metronome
 (def metro (metronome 110))
-(def action-list (basic-bass-sequence))
-(def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
-; primitive-bass-line is a straight list, not a loop; use the code which uses "cycle" for an infinite loop
-; however that line of code is legit; just create something dynamic to replace the hard-coded :c3 note
 
-; merge in the notes beforehand using a seq comprehension and some kind of
-; note-assigning function.
+; synonym? I don't know why I did this
+(def action-list (basic-bass-sequence))
+
+; "good enough" bassline
+(def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
+
+; translate from "on tie" approach to concept of note duration
 (defn determine-note-duration
   ([subsequent-actions]
     (determine-note-duration subsequent-actions 0))
@@ -165,7 +207,7 @@
       (determine-note-duration (rest subsequent-actions) (+ duration 0.25))
       (+ duration 0.19))))
 
-
+; schedule notes to play
 (defn token-to-midi-action-2 [metro tick note-action-pairs]
   (let [current-note (first (first note-action-pairs))
         current-action (second (first note-action-pairs))
@@ -181,17 +223,23 @@
                 metro next-tick
                 (next note-action-pairs) []))))
 
+; scavenged drum sounds
+
+; drum sounds (sampled)
 (def snare (sample (freesound-path 26903)))
 (def kick (sample (freesound-path 2086)))
 
+; drum sound (synthesized)
 (definst hat [volume 1.0]
   (let [src (white-noise)
         env (env-gen (perc 0.001 0.1) :action FREE)]
     (* volume 1 src env)))
 
+; volume modified
 (defn weak-hat []
   (hat 0.3))
 
+; play a typical moombahton beat
 (defn simple-moom [metro beat-number]
 
   ; kick
@@ -214,14 +262,11 @@
 
   (apply-at (metro (+ 4 beat-number)) simple-moom metro (+ 4 beat-number) []))
 
+; drums!
 (defn drums []
   (simple-moom metro (metro)))
 
-
-(defn go []
-  (drums)
-  (bass))
-
+; bass!
 (defn bass []
   ; FIXME: these should be in a let, not global like this
   ; FIXME: DRY
@@ -229,16 +274,20 @@
   (def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
 
-; gotta get my dev on
+; go!
+(defn go []
+  (drums)
+  (bass))
 
-(def fg "you have to quit the repl with control-D first")
+; nice example
+(defn nice-example []
+  (def primitive-bass-line '([:eb16 on] [:eb15 tie] [:bb15 off] [:bb15 off] [:ab15 on] [:eb16 off] [:db15 on] [:eb15 tie] [:gb15 off] [:gb15 off] [:ab15 off] [:db15 off] [:eb15 off] [:bb15 off] [:ab15 on] [:db15 tie] [:eb16 on] [:bb15 tie] [:gb15 on] [:db15 tie] [:ab15 on] [:db15 tie] [:eb15 off] [:ab15 off] [:db15 off] [:gb15 on] [:gb15 off] [:db15 on] [:gb15 tie] [:db15 on] [:db15 off] [:db15 on]))
+  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+  (drums))
 
-; lein bs
-
+; lein bs (clojure plumbing)
 (defn -main [])
 
 ; these synths sound great even though the project they're in doesn't even run >.<
 ; https://github.com/ctford/whelmed/blob/master/src/whelmed/instrument.clj
-
-; FIXME the harder problem is getting the drums to happen at the same time
 
