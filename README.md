@@ -1,13 +1,17 @@
 # markov-bass-lines
 
-A Clojure library designed to ... well, that part is up to you.
+class project for WACM 2013:
 
-## Usage
+http://arts.ucsc.edu/programs/wacm
 
-FIXME
+## zomg markov music what?
+
+You can use this to auto-generate a basic moombahton skeleton. It's very much an
+unfinished sketch.
 
 ## License
 
-Copyright © 2013 FIXME
+Copyright © 2013 Giles Bowkett
 
-Distributed under the Eclipse Public License, the same as Clojure.
+Distributed under the MIT License
+
