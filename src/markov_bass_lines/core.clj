@@ -192,12 +192,6 @@
 ; metronome
 (def metro (metronome 110))
 
-; synonym? I don't know why I did this
-(def action-list (basic-bass-sequence))
-
-; "good enough" bassline
-(def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
-
 ; translate from "on tie" approach to concept of note duration
 (defn determine-note-duration
   ([subsequent-actions]
@@ -268,11 +262,9 @@
 
 ; bass!
 (defn bass []
-  ; FIXME: these should be in a let, not global like this
   ; FIXME: DRY
-  (def action-list (basic-bass-sequence))
-  (def primitive-bass-line (for [action action-list] [(random-minor-pentatonic) action]))
-  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line)))
+  (let [primitive-bass-line (for [action (basic-bass-sequence)] [(random-minor-pentatonic) action])]
+    (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))))
 
 ; go!
 (defn go []
@@ -281,9 +273,16 @@
 
 ; nice example
 (defn nice-example []
-  (def primitive-bass-line '([:eb16 on] [:eb15 tie] [:bb15 off] [:bb15 off] [:ab15 on] [:eb16 off] [:db15 on] [:eb15 tie] [:gb15 off] [:gb15 off] [:ab15 off] [:db15 off] [:eb15 off] [:bb15 off] [:ab15 on] [:db15 tie] [:eb16 on] [:bb15 tie] [:gb15 on] [:db15 tie] [:ab15 on] [:db15 tie] [:eb15 off] [:ab15 off] [:db15 off] [:gb15 on] [:gb15 off] [:db15 on] [:gb15 tie] [:db15 on] [:db15 off] [:db15 on]))
-  (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
-  (drums))
+  (let [primitive-bass-line '([:eb16 on]  [:eb15 tie] [:bb15 off] [:bb15 off]
+                              [:ab15 on]  [:eb16 off] [:db15 on]  [:eb15 tie]
+                              [:gb15 off] [:gb15 off] [:ab15 off] [:db15 off]
+                              [:eb15 off] [:bb15 off] [:ab15 on]  [:db15 tie]
+                              [:eb16 on]  [:bb15 tie] [:gb15 on]  [:db15 tie]
+                              [:ab15 on]  [:db15 tie] [:eb15 off] [:ab15 off]
+                              [:db15 off] [:gb15 on]  [:gb15 off] [:db15 on]
+                              [:gb15 tie] [:db15 on]  [:db15 off] [:db15 on])]
+    (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+    (drums)))
 
 ; lein bs (clojure plumbing)
 (defn -main [])
