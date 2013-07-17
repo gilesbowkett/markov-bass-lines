@@ -40,15 +40,11 @@
                         (first (rest title-and-notes)))
                     titles-and-basslines))
 
-; the lone properly-documented function
-(defn n-gram-freqs
-      "get n-grams of arbitrary size, and their frequencies"
-      [n]
-  (apply merge-with
-   +
-   (map (comp frequencies
-              (partial partition n 1))
-        basslines)))
+; get n-grams of arbitrary size, and their frequencies
+(defn n-gram-freqs [n]
+  (apply merge-with + (map (comp frequencies
+                                 (partial partition n 1))
+                           basslines)))
 
 ; start on the downbeat. true for every one of the corpus basslines, and
 ; probably every funk bassline since the dawn of time.
@@ -77,13 +73,14 @@
                  (first (first t-and-f))))
           tokens-and-frequencies))
 
-; markov-bass-lines.core=> (determine-probabilities (relevant-n-grams-only '{(tie tie) 1, (tie on) 3, (foo bar) 1} 'tie))
-; ({(tie tie) 1/4} {(tie on) 3/4})
+; so:
+; (determine-probabilities (relevant-n-grams-only '{(tie tie) 1, (tie on) 3, (foo bar) 1} 'tie))
+; => ({(tie tie) 1/4} {(tie on) 3/4})
 
 ; find the denominators in a list like that
 (defn denominators [probability-map]
-  (distinct (map (fn [fraction]
-                     (denominator (first (vals fraction))))
+  (distinct (map (fn [tokens-and-fraction]
+                     (denominator (first (vals tokens-and-fraction))))
                  probability-map)))
 
 ; figure out the lowest common denominator
@@ -262,8 +259,8 @@
 
 ; bass!
 (defn bass []
-  ; FIXME: DRY
-  (let [primitive-bass-line (for [action (basic-bass-sequence)] [(random-minor-pentatonic) action])]
+  (let [primitive-bass-line (for [action (basic-bass-sequence)]
+                                 [(random-minor-pentatonic) action])]
     (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))))
 
 ; go!
