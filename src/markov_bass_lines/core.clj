@@ -60,28 +60,28 @@
            (let [freq (last t-and-f)
                  tokens (first t-and-f)]
              {tokens (/ freq
-                        (apply +
-                               (vals tokens-and-frequencies)))}))
+                        (apply + (vals tokens-and-frequencies)))}))
        tokens-and-frequencies))
 
 ; filter out irrelevant n-grams, e.g.:
+;
 ; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 2) 'on))
 ; --> ({(on tie) 62/131} {(on on) 34/131} {(on off) 35/131})
-; but:
-; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 4) '(on tie on on)))
-; --> ???
+;
+; or:
+;
+; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 8) '(on tie on on)))
+; --> ({(on tie on on off on off on) 1/4} {(on tie on on tie on tie off) 1/8}
+;      {(on tie on on on tie off on) 1/8} {(on tie on on off on on on) 1/8}
+;      {(on tie on on off on tie on) 1/8} {(on tie on on tie off on off) 1/4})
+
 (defn relevant-n-grams-only [tokens-and-frequencies target]
   (filter (fn [t-and-f]
-              (if (list? target)
-                  (= target
-                     (take (count target) (first t-and-f)))
-                  (= target
-                     (first (first t-and-f)))))
+              (= target
+                (if (list? target)
+                    (take (count target) (first t-and-f))
+                    (first (first t-and-f)))))
           tokens-and-frequencies))
-
-; so:
-; (determine-probabilities (relevant-n-grams-only '{(tie tie) 1, (tie on) 3, (foo bar) 1} 'tie))
-; => ({(tie tie) 1/4} {(tie on) 3/4})
 
 ; find the denominators in a list like that
 (defn denominators [probability-map]
@@ -96,11 +96,24 @@
       (first denoms)
       (reduce math/lcm denoms))))
 
+; FIXME: normalize-markov-elements needs to do one thing against a list of two elements
+; and another against a list of 8. depending on whether you're looking at an actual Markov
+; chain, or just a simple probability table. make-markov-list probably requires similar
+; adjustments.
+
+(defn get-the-dang-probability [tokens-and-probability]
+  (num (last (last tokens-and-probability))))
+
+(defn get-the-dang-latter-half-of-the-tokens-list [tokens-and-probability]
+  ; this works great when it's going against bigrams, i.e., first-order Markov,
+  ; now I just need to support the fourth-order chains or whatever
+  (second (first (keys tokens-and-probability))))
+
 ; multiply all fractions by a common denominator
-(defn normalize-markov-elements [token-fraction-pair list-denom]
-  (let [possible-choice (second (first (first token-fraction-pair)))
-        num (last (last token-fraction-pair))]
-    (repeat (* list-denom num) possible-choice)))
+(defn normalize-markov-elements [tokens-and-probability list-denom]
+  (let [possible-choice (get-the-dang-latter-half-of-the-tokens-list tokens-and-probability)
+        probability (get-the-dang-probability tokens-and-probability)]
+    (repeat (* list-denom probability) possible-choice)))
 
 ; create a big list to grab random elements from, like the markov
 ; implementation we did in class
@@ -134,12 +147,8 @@
 
 ; the below function fails, because it passes a list (namely first-four-notes)
 ; to lz-sq-markov, but lz-sq-markov's only equipped to receive a single element.
-; so for the below to work, lz-sq-markov (and possibly the shit it plugs into)
-; has to be able to accomodate a list or a single element. it looks like the
-; functions I have to change are relevant-n-grams-only, choose-markov-element,
-; and lz-sq-markov (which btw has a pretty pitiful name). so that's only three
-; functions. it actually could be worse. but it doesn't say good things about
-; my design that the same single parameter passes through three functions.
+; I fixed relevant-n-grams-only; current FIXME is for normalize-markov-elements
+; and possibly make-markov-list as well.
 (defn more-structured-bass-sequence []
   (let [first-four-notes (concat [first-note]
                                  (take 3 (lz-sq-markov first-note 2)))]
