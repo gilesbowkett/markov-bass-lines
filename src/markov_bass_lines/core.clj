@@ -104,6 +104,19 @@
 (defn get-the-dang-probability [tokens-and-probability]
   (num (last (last tokens-and-probability))))
 
+; currently correct:
+; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(tie on) 10/21})
+; on
+; currently wrong:
+; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(on on tie on off off on tie) 10/21})
+; on
+; should be:
+; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(tie on) 10/21})
+; (on)
+; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(on on tie on off off on tie) 10/21})
+; (off off on tie)
+; should be:
+
 (defn get-the-dang-latter-half-of-the-tokens-list [tokens-and-probability]
   ; this works great when it's going against bigrams, i.e., first-order Markov,
   ; now I just need to support the fourth-order chains or whatever
