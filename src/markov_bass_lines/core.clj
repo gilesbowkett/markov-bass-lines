@@ -67,10 +67,16 @@
 ; filter out irrelevant n-grams, e.g.:
 ; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 2) 'on))
 ; --> ({(on tie) 62/131} {(on on) 34/131} {(on off) 35/131})
-(defn relevant-n-grams-only [tokens-and-frequencies target-token]
+; but:
+; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 4) '(on tie on on)))
+; --> ???
+(defn relevant-n-grams-only [tokens-and-frequencies target]
   (filter (fn [t-and-f]
-              (= target-token
-                 (first (first t-and-f))))
+              (if (list? target)
+                  (= target
+                     (take (count target) (first t-and-f)))
+                  (= target
+                     (first (first t-and-f)))))
           tokens-and-frequencies))
 
 ; so:
@@ -105,30 +111,42 @@
                 probability-map)))
 
 ; now randomly select an element from the above list
-(defn choose-markov-element [prev-element]
-  ; probably for efficiency I should move some of this up a bit, later. the only
-  ; part that actually needs to run every time is rand-nth. and of course it has
-  ; to scoop up the prev elements and collect/recycle them. I guess the argument
-  ; to n-gram-freqs will change too, when I make the markov process more layered.
+(defn choose-markov-element [previous-element n]
   (rand-nth
     (make-markov-list
       (determine-probabilities
-        (relevant-n-grams-only (n-gram-freqs 2)
-                               prev-element)))))
+        (relevant-n-grams-only (n-gram-freqs n)
+                               previous-element)))))
 
 ; create a clojure "lazy sequence" (infinite quasi-list)
 ; tldr this is how you recurse
-(defn lz-sq-markov [prev-element]
-    (lazy-seq
-      (let [new-element (choose-markov-element prev-element)]
-        (cons new-element
-              (lz-sq-markov new-element)))))
+(defn lz-sq-markov [previous-element n]
+  (lazy-seq
+    (let [new-element (choose-markov-element previous-element n)]
+      (cons new-element
+            (lz-sq-markov new-element n)))))
 
 ; grab 32 16th notes, i.e., a two-bar bassline loop
 (defn basic-bass-sequence []
   ; probably for elegance some of this logic should roll up into lz-sq-markov
   (concat [first-note]
-          (take 31 (lz-sq-markov first-note))))
+          (take 31 (lz-sq-markov first-note 2))))
+
+; the below function fails, because it passes a list (namely first-four-notes)
+; to lz-sq-markov, but lz-sq-markov's only equipped to receive a single element.
+; so for the below to work, lz-sq-markov (and possibly the shit it plugs into)
+; has to be able to accomodate a list or a single element. it looks like the
+; functions I have to change are relevant-n-grams-only, choose-markov-element,
+; and lz-sq-markov (which btw has a pretty pitiful name). so that's only three
+; functions. it actually could be worse. but it doesn't say good things about
+; my design that the same single parameter passes through three functions.
+(defn more-structured-bass-sequence []
+  (let [first-four-notes (concat [first-note]
+                                 (take 3 (lz-sq-markov first-note 2)))]
+    (concat first-four-notes
+            (take 12 (lz-sq-markov first-four-notes 4))
+            first-four-notes
+            (take 12 (lz-sq-markov first-four-notes 4)))))
 
 ; scavenged synth (modified)
 ; http://jvmsoup.com/2012/11/28/hoover-sound-in-overtone/
