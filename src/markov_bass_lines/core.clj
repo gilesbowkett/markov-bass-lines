@@ -80,7 +80,7 @@
               (= target
                 (if (list? target)
                     (take (count target) (first t-and-f))
-                    (first (first t-and-f)))))
+                    (ffirst t-and-f))))
           tokens-and-frequencies))
 
 ; find the denominators in a list like that
@@ -231,7 +231,7 @@
 
 ; schedule notes to play
 (defn token-to-midi-action-2 [metro tick note-action-pairs]
-  (let [current-note (first (first note-action-pairs))
+  (let [current-note (ffirst note-action-pairs)
         current-action (second (first note-action-pairs))
         next-action (second (second note-action-pairs))
         next-tick (+ 0.25 tick)]
@@ -239,7 +239,7 @@
       (let [duration (determine-note-duration (rest note-action-pairs))
             bass-synth-id (at (metro tick) (bass-synth (note current-note)))]
         (at (metro (+ tick duration)) (ctl bass-synth-id :gate 0))))
-    (if (not (empty? note-action-pairs))
+    (if (seq note-action-pairs)
       (apply-at (metro next-tick)
                 token-to-midi-action-2
                 metro next-tick
