@@ -101,31 +101,21 @@
 ; chain, or just a simple probability table. make-markov-list probably requires similar
 ; adjustments.
 
-(defn get-the-dang-probability [tokens-and-probability]
+(defn extract-probability [tokens-and-probability]
   (num (last (last tokens-and-probability))))
 
-; currently correct:
-; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(tie on) 10/21})
-; on
-; currently wrong:
-; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(on on tie on off off on tie) 10/21})
-; on
-; should be:
-; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(tie on) 10/21})
+; markov-bass-lines.core=> (extract-possible-choice {'(tie on) 10/21})
 ; (on)
-; markov-bass-lines.core=> (get-the-dang-latter-half-of-the-tokens-list {'(on on tie on off off on tie) 10/21})
+; markov-bass-lines.core=> (extract-possible-choice {'(on on tie on off off on tie) 10/21})
 ; (off off on tie)
-; should be:
-
-(defn get-the-dang-latter-half-of-the-tokens-list [tokens-and-probability]
-  ; this works great when it's going against bigrams, i.e., first-order Markov,
-  ; now I just need to support the fourth-order chains or whatever
-  (second (first (keys tokens-and-probability))))
+(defn extract-possible-choice [tokens-and-probability]
+  (let [tokens (first (keys tokens-and-probability))]
+    (drop (* (/ 1 2) (count tokens)) tokens)))
 
 ; multiply all fractions by a common denominator
 (defn normalize-markov-elements [tokens-and-probability list-denom]
-  (let [possible-choice (get-the-dang-latter-half-of-the-tokens-list tokens-and-probability)
-        probability (get-the-dang-probability tokens-and-probability)]
+  (let [possible-choice (extract-possible-choice tokens-and-probability)
+        probability (extract-probability tokens-and-probability)]
     (repeat (* list-denom probability) possible-choice)))
 
 ; create a big list to grab random elements from, like the markov
@@ -157,6 +147,7 @@
   ; probably for elegance some of this logic should roll up into lz-sq-markov
   (concat [first-note]
           (take 31 (lz-sq-markov first-note 2))))
+  ; ??? (take 32 (lz-sq-markov first-note 2)) would this work?? FIXME
 
 ; the below function fails, because it passes a list (namely first-four-notes)
 ; to lz-sq-markov, but lz-sq-markov's only equipped to receive a single element.

@@ -6,4 +6,6 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [overtone "0.8.1"]
-                 [org.clojure/math.numeric-tower "0.0.2"]])
+                 [org.clojure/math.numeric-tower "0.0.2"]]
+  :profiles {:dev {:plugins [[lein-kibit "0.0.8"]]}})
+
