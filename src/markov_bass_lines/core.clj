@@ -201,9 +201,9 @@
     zout))
 
 ; infinite:
-;   (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+;   (token-to-midi-action metro (metro) (cycle primitive-bass-line))
 ; finite:
-;   (token-to-midi-action-2 metro (metro) primitive-bass-line)
+;   (token-to-midi-action metro (metro) primitive-bass-line)
 
 ; get a random note from the minor pentatonic Eb scale (all black keys)
 (defn random-minor-pentatonic []
@@ -224,7 +224,7 @@
       (+ duration 0.19))))
 
 ; schedule notes to play
-(defn token-to-midi-action-2 [metro tick note-action-pairs]
+(defn token-to-midi-action [metro tick note-action-pairs]
   (let [current-note (ffirst note-action-pairs)
         current-action (second (first note-action-pairs))
         next-action (second (second note-action-pairs))
@@ -235,7 +235,7 @@
         (at (metro (+ tick duration)) (ctl bass-synth-id :gate 0))))
     (if (seq note-action-pairs)
       (apply-at (metro next-tick)
-                token-to-midi-action-2
+                token-to-midi-action
                 metro next-tick
                 (next note-action-pairs) []))))
 
@@ -286,7 +286,7 @@
 (defn bass []
   (let [primitive-bass-line (for [action (basic-bass-sequence)]
                                  [(random-minor-pentatonic) action])]
-    (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))))
+    (token-to-midi-action metro (metro) (cycle primitive-bass-line))))
 
 ; go!
 (defn go []
@@ -303,7 +303,7 @@
                               [:ab15 on]  [:db15 tie] [:eb15 off] [:ab15 off]
                               [:db15 off] [:gb15 on]  [:gb15 off] [:db15 on]
                               [:gb15 tie] [:db15 on]  [:db15 off] [:db15 on])]
-    (token-to-midi-action-2 metro (metro) (cycle primitive-bass-line))
+    (token-to-midi-action metro (metro) (cycle primitive-bass-line))
     (drums)))
 
 ; lein bs (clojure plumbing)
