@@ -100,7 +100,6 @@
 ; and another against a list of 8. depending on whether you're looking at an actual Markov
 ; chain, or just a simple probability table. make-markov-list probably requires similar
 ; adjustments.
-
 (defn extract-probability [tokens-and-probability]
   (num (last (last tokens-and-probability))))
 
@@ -144,15 +143,10 @@
 
 ; grab 32 16th notes, i.e., a two-bar bassline loop
 (defn basic-bass-sequence []
-  ; probably for elegance some of this logic should roll up into lz-sq-markov
-  (concat [first-note]
-          (take 31 (lz-sq-markov first-note 2))))
-  ; ??? (take 32 (lz-sq-markov first-note 2)) would this work?? FIXME
+  (take 32 (lz-sq-markov first-note 2)))
 
 ; the below function fails, because it passes a list (namely first-four-notes)
 ; to lz-sq-markov, but lz-sq-markov's only equipped to receive a single element.
-; I fixed relevant-n-grams-only; current FIXME is for normalize-markov-elements
-; and possibly make-markov-list as well.
 (defn more-structured-bass-sequence []
   (let [first-four-notes (concat [first-note]
                                  (take 3 (lz-sq-markov first-note 2)))]
