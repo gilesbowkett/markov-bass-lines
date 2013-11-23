@@ -191,6 +191,7 @@
 
 
 ; foolishness
+; https://github.com/overtone/overtone/blob/master/src/overtone/inst/synth.clj
 (definst bubbles
   [bass-freq 80]
   (let [bub (+ bass-freq (* 3 (lf-saw:kr [8 7.23])))
