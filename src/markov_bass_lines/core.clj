@@ -4,25 +4,35 @@
   (:use overtone.live))
 
 (def basslines
-  '( (on tie off on on tie off off on tie on on off on off on on tie on on off on off on on on on on tie off on off)
+  '((on tie off on on tie off off on tie on on off on off on
+     on tie on on off on off on on on on on tie off on off)
 
-     (on off off on off off on off off off off off off off off on on off on on off off on off off off off off off off off off)
+    (on off off on off off on off off off off off off off off on
+     on off on on off off on off off off off off off off off off)
 
-     (on tie on off on tie off on off on tie on on on tie off on tie on off on tie off on on on on off on tie off off)
+    (on tie on off on tie off on off on tie on on on tie off
+     on tie on off on tie off on on on on off on tie off off)
 
-     (on tie on tie on tie on tie on tie on on tie off on off on tie on tie on tie on tie on tie on on tie off on off)
+    (on tie on tie on tie on tie on tie on on tie off on off
+     on tie on tie on tie on tie on tie on on tie off on off)
 
-     (on tie off off off off off on on tie off off off off off on on on on tie off on tie off on tie off on on tie on tie)
+    (on tie off off off off off on on tie off off off off off on
+     on on on tie off on tie off on tie off on on tie on tie)
 
-     (on tie off off on tie off off on tie off off on on off on tie on on off on tie on tie on tie on on tie on tie off)
+    (on tie off off on tie off off on tie off off on on off on
+     tie on on off on tie on tie on tie on on tie on tie off)
 
-     (on tie on off off on off on on tie off off off off off on on tie on tie off on off on on tie off off off off off off)
+    (on tie on off off on off on on tie off off off off off on
+     on tie on tie off on off on on tie off off off off off off)
 
-     (on tie off on off off on off on off on off on on off on on tie off on off off on off on off on off on off on off)
+    (on tie off on off off on off on off on off on on off on
+     on tie off on off off on off on off on off on off on off)
 
-     (on tie tie tie off off on off on tie off off off off on tie on tie on tie off off on tie on tie on tie off off off off)
+    (on tie tie tie off off on off on tie off off off off on tie
+     on tie on tie off off on tie on tie on tie off off off off)
 
-     (on tie off off on tie off off on tie on on off on on on on tie on tie on tie off on tie off off off off off off off)))
+    (on tie off off on tie off off on tie on on off on on on
+     on tie on tie on tie off on tie off off off off off off off)))
 
 ; get n-grams of arbitrary size, and their frequencies
 (defn n-gram-freqs [n]
@@ -54,7 +64,8 @@
 ;
 ; or:
 ;
-; (determine-probabilities (relevant-n-grams-only (n-gram-freqs 8) '(on tie on on)))
+; (determine-probabilities
+;   (relevant-n-grams-only (n-gram-freqs 8) '(on tie on on)))
 ; --> ({(on tie on on off on off on) 1/4} {(on tie on on tie on tie off) 1/8}
 ;      {(on tie on on on tie off on) 1/8} {(on tie on on off on on on) 1/8}
 ;      {(on tie on on off on tie on) 1/8} {(on tie on on tie off on off) 1/4})
@@ -80,16 +91,12 @@
       (first denoms)
       (reduce math/lcm denoms))))
 
-; FIXME: normalize-markov-elements needs to do one thing against a list of two elements
-; and another against a list of 8. depending on whether you're looking at an actual Markov
-; chain, or just a simple probability table. make-markov-list probably requires similar
-; adjustments.
 (defn extract-probability [tokens-and-probability]
   (num (last (last tokens-and-probability))))
 
-; markov-bass-lines.core=> (extract-possible-choice {'(tie on) 10/21})
+; => (extract-possible-choice {'(tie on) 10/21})
 ; (on)
-; markov-bass-lines.core=> (extract-possible-choice {'(on on tie on off off on tie) 10/21})
+; => (extract-possible-choice {'(on on tie on off off on tie) 10/21})
 ; (off off on tie)
 (defn extract-possible-choice [tokens-and-probability]
   (let [tokens (first (keys tokens-and-probability))]
@@ -106,7 +113,7 @@
 (defn make-markov-list [probability-map]
   (flatten (map (fn [t-f-pair]
                     (normalize-markov-elements t-f-pair
-                                               (denominator-for-markov-list probability-map)))
+                       (denominator-for-markov-list probability-map)))
                 probability-map)))
 
 ; now randomly select an element from the above list
@@ -129,46 +136,40 @@
 (defn basic-bass-sequence []
   (take 32 (lz-sq-markov first-note 2)))
 
-; the below function fails, because it passes a list (namely first-four-notes)
-; to lz-sq-markov, but lz-sq-markov's only equipped to receive a single element.
-(defn more-structured-bass-sequence []
-  (let [first-four-notes (concat [first-note]
-                                 (take 3 (lz-sq-markov first-note 2)))]
-    (concat first-four-notes
-            (take 12 (lz-sq-markov first-four-notes 4))
-            first-four-notes
-            (take 12 (lz-sq-markov first-four-notes 4)))))
-
 ; scavenged synth (modified)
 ; http://jvmsoup.com/2012/11/28/hoover-sound-in-overtone/
 (defsynth hoover [freq 220 amp 5 lgu 0.1 lgd 1 gate 1]
-   (let [pwm (lin-lin (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
-         freq (lag-ud freq lgu lgd)
-         freq (*
-                freq
-                (lin-exp (sin-osc:kr
-                               (vec (repeatedly 3 #(ranged-rand 2.9 3.1)))
-                               (vec (repeatedly 3 #(ranged-rand 0 (* 2 Math/PI))))
-                               ) -1 1 0.995 1.005))
-         mix (*
-               0.1
-               (apply +
-                      (*
-                        (lin-lin (lf-saw (* [0.25 0.5 1] freq) 1) -1 1 0 1)
-                        (- 1 (lf-pulse:ar (* freq [0.5 1 2]) 0 pwm)))))
-         ;bass
-         mix (+ mix (lf-par (* 0.25 freq) 0))
-         mix (mul-add mix 0.1 0)
-         ;eq
-         mix (b-peak-eq mix 6000 1 3)
-         mix (b-peak-eq mix 3500 1 6)
-         ;chorus
-         mix (+ mix
-               (* 0.5 (comb-c mix 1/200
-                           (lin-lin (sin-osc:kr 3 [(* 0.5 Math/PI) (* 1.5 Math/PI)]) -1 1 1/300 1/200)
-                           0)))
-         env (env-gen (asr) gate)]
-     (out 0 (* mix env amp))))
+  (let [pwm
+        (lin-lin
+          (sin-osc:kr (vec (repeatedly 3 #(ranged-rand 2 4)))) -1 1 0.125 0.875)
+      freq (lag-ud freq lgu lgd)
+      freq (*
+           freq
+           (lin-exp (sin-osc:kr
+                     (vec (repeatedly 3 #(ranged-rand 2.9 3.1)))
+                     (vec (repeatedly 3 #(ranged-rand 0 (* 2 Math/PI))))
+                     ) -1 1 0.995 1.005))
+      mix (*
+          0.1
+          (apply +
+               (*
+                (lin-lin (lf-saw (* [0.25 0.5 1] freq) 1) -1 1 0 1)
+                (- 1 (lf-pulse:ar (* freq [0.5 1 2]) 0 pwm)))))
+      ;bass
+      mix (+ mix (lf-par (* 0.25 freq) 0))
+      mix (mul-add mix 0.1 0)
+      ;eq
+      mix (b-peak-eq mix 6000 1 3)
+      mix (b-peak-eq mix 3500 1 6)
+      ;chorus
+      mix (+ mix
+          (* 0.5 (comb-c mix 1/200
+                   (lin-lin
+                     (sin-osc:kr 3 [(* 0.5 Math/PI)
+                                    (* 1.5 Math/PI)]) -1 1 1/300 1/200)
+                  0)))
+      env (env-gen (asr) gate)]
+    (out 0 (* mix env amp))))
 
 (def bass-synth hoover)
 
